@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css?family=Raleway:400,700');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;	
+  font-family: Raleway, sans-serif;
+}
+
+.clip-envelope-flap {
+  clip-path: polygon(0 100%, 50% 0, 100% 100%);
+}
