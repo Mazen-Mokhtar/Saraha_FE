@@ -14,10 +14,20 @@ interface SignupData {
   gender: 'male' | 'female';
 }
 
+interface ValidationErrors {
+  userName?: string;
+  email?: string;
+  password?: string;
+  phone?: string;
+  DOB?: string;
+}
+
 export default function Home() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [signupData, setSignupData] = useState<SignupData>({
     userName: '',
     email: '',
@@ -26,6 +36,7 @@ export default function Home() {
     DOB: '',
     gender: 'male'
   });
+  const [signupErrors, setSignupErrors] = useState<ValidationErrors>({});
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
@@ -40,15 +51,108 @@ export default function Home() {
     );
   }, []);
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      return 'Email is required';
+    }
+    if (!emailRegex.test(email)) {
+      return 'Please enter a valid email address';
+    }
+    return '';
+  };
+
+  const validatePassword = (password: string) => {
+    if (!password) {
+      return 'Password is required';
+    }
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long';
+    }
+    if (!/(?=.*[a-z])/.test(password)) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!/(?=.*[A-Z])/.test(password)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!/(?=.*\d)/.test(password)) {
+      return 'Password must contain at least one number';
+    }
+    return '';
+  };
+
+  const validatePhone = (phone: string) => {
+    const phoneRegex = /^(\+201|01)[0-2,5]{1}[0-9]{8}$/;
+    if (!phone) {
+      return 'Phone number is required';
+    }
+    if (!phoneRegex.test(phone)) {
+      return 'Please enter a valid Egyptian phone number';
+    }
+    return '';
+  };
+
+  const validateUserName = (userName: string) => {
+    if (!userName) {
+      return 'Username is required';
+    }
+    if (userName.length < 2) {
+      return 'Username must be at least 2 characters long';
+    }
+    if (userName.length > 20) {
+      return 'Username must be less than 20 characters';
+    }
+    if (!/^[a-zA-Z0-9]+$/.test(userName)) {
+      return 'Username can only contain letters and numbers';
+    }
+    return '';
+  };
+
+  const validateDOB = (dob: string) => {
+    if (!dob) {
+      return 'Date of birth is required';
+    }
+    const dobDate = new Date(dob);
+    const today = new Date();
+    const age = today.getFullYear() - dobDate.getFullYear();
+    if (age < 13) {
+      return 'You must be at least 13 years old';
+    }
+    return '';
+  };
+
+  const validateSignupForm = () => {
+    const errors: ValidationErrors = {};
+    errors.userName = validateUserName(signupData.userName);
+    errors.email = validateEmail(signupData.email);
+    errors.password = validatePassword(signupData.password);
+    errors.phone = validatePhone(signupData.phone);
+    errors.DOB = validateDOB(signupData.DOB);
+
+    setSignupErrors(errors);
+    return !Object.values(errors).some(error => error !== '');
+  };
+
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setPopupMessage(message);
     setPopupType(type);
     setShowPopup(true);
-    setTimeout(() => setShowPopup(false), 5000); // Auto-hide after 5 seconds
+    setTimeout(() => setShowPopup(false), 5000);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
+
+    setEmailError(emailValidation);
+    setPasswordError(passwordValidation);
+
+    if (emailValidation || passwordValidation) {
+      return;
+    }
+
     setIsLoggingIn(true);
     const result = await login({ email, password });
     if (result?.requiresEmailActivation) {
@@ -59,6 +163,11 @@ export default function Home() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateSignupForm()) {
+      return;
+    }
+
     setIsLoggingIn(true);
     setSignupError(null);
 
@@ -75,6 +184,31 @@ export default function Home() {
     } finally {
       setIsLoggingIn(false);
     }
+  };
+
+  const handleSignupInputChange = (field: keyof SignupData, value: string) => {
+    setSignupData(prev => ({ ...prev, [field]: value }));
+    
+    let error = '';
+    switch (field) {
+      case 'userName':
+        error = validateUserName(value);
+        break;
+      case 'email':
+        error = validateEmail(value);
+        break;
+      case 'password':
+        error = validatePassword(value);
+        break;
+      case 'phone':
+        error = validatePhone(value);
+        break;
+      case 'DOB':
+        error = validateDOB(value);
+        break;
+    }
+    
+    setSignupErrors(prev => ({ ...prev, [field]: error }));
   };
 
   const formVariants = {
@@ -102,7 +236,6 @@ export default function Home() {
         type={popupType}
       />
 
-      {/* Floating Anonymous Masks */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-10 left-[10%] text-white/20 text-6xl">
           <i className="fas fa-user-secret"></i>
@@ -209,11 +342,17 @@ export default function Home() {
                   <input 
                     type="text" 
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError(validateEmail(e.target.value));
+                    }}
                     className="w-full bg-white/5 border-2 border-white/10 rounded-xl px-11 py-3 text-white placeholder-white/40 focus:border-white/20 focus:outline-none transition-all duration-300"
                     placeholder="Email"
                     disabled={isLoading || isLoggingIn}
                   />
+                  {emailError && (
+                    <p className="mt-1 text-red-400 text-sm">{emailError}</p>
+                  )}
                 </motion.div>
                 <motion.div 
                   className="relative"
@@ -225,17 +364,23 @@ export default function Home() {
                   <input 
                     type="password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setPasswordError(validatePassword(e.target.value));
+                    }}
                     className="w-full bg-white/5 border-2 border-white/10 rounded-xl px-11 py-3 text-white placeholder-white/40 focus:border-white/20 focus:outline-none transition-all duration-300"
                     placeholder="Password"
                     disabled={isLoading || isLoggingIn}
                   />
+                  {passwordError && (
+                    <p className="mt-1 text-red-400 text-sm">{passwordError}</p>
+                  )}
                 </motion.div>
                 <motion.button 
                   className="w-full bg-white text-purple-900 py-3 px-6 rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  disabled={isLoading || isLoggingIn}
+                  disabled={isLoading || isLoggingIn || !!emailError || !!passwordError}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
@@ -278,11 +423,14 @@ export default function Home() {
                     <input 
                       type={field.type}
                       value={signupData[field.key as keyof SignupData]}
-                      onChange={(e) => setSignupData({...signupData, [field.key]: e.target.value})}
+                      onChange={(e) => handleSignupInputChange(field.key as keyof SignupData, e.target.value)}
                       className="w-full bg-white/5 border-2 border-white/10 rounded-xl px-11 py-3 text-white placeholder-white/40 focus:border-white/20 focus:outline-none transition-all duration-300"
                       placeholder={field.placeholder}
                       disabled={isLoggingIn}
                     />
+                    {signupErrors[field.key as keyof ValidationErrors] && (
+                      <p className="mt-1 text-red-400 text-sm">{signupErrors[field.key as keyof ValidationErrors]}</p>
+                    )}
                   </motion.div>
                 ))}
                 
@@ -296,11 +444,14 @@ export default function Home() {
                   <input 
                     type="date"
                     value={signupData.DOB}
-                    onChange={(e) => setSignupData({...signupData, DOB: e.target.value})}
+                    onChange={(e) => handleSignupInputChange('DOB', e.target.value)}
                     className="w-full bg-white/5 border-2 border-white/10 rounded-xl px-11 py-3 text-white placeholder-white/40 focus:border-white/20 focus:outline-none transition-all duration-300"
                     max={new Date().toISOString().split('T')[0]}
                     disabled={isLoggingIn}
                   />
+                  {signupErrors.DOB && (
+                    <p className="mt-1 text-red-400 text-sm">{signupErrors.DOB}</p>
+                  )}
                 </motion.div>
 
                 <motion.div 
@@ -338,7 +489,7 @@ export default function Home() {
                   className="w-full bg-white text-purple-900 py-3 px-6 rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-300"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  disabled={isLoggingIn}
+                  disabled={isLoggingIn || Object.values(signupErrors).some(error => error !== '')}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.6 }}
